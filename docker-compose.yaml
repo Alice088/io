@@ -1,0 +1,14 @@
+services:
+  flight-computer:
+    build:
+      context: .
+      target: flight
+
+    container_name: mun-eve-fsw
+
+    mem_limit: 16m
+    cpus: 0.25
+    pids_limit: 8
+
+    stdin_open: true
+    tty: true
