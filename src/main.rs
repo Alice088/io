@@ -25,7 +25,7 @@ fn main() {
             println!("task3");
         }),
         Task::new("task4", 2000, || {
-            std::thread::sleep(std::time::Duration::from_millis(5000));
+            std::thread::sleep(std::time::Duration::from_millis(1000));
             println!("task4");
         }),
     ];
