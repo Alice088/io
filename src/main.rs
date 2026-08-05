@@ -6,6 +6,7 @@ use crate::kernel::clock;
 use crate::kernel::scheduler::Scheduler;
 use crate::kernel::watchdog::Watchdog;
 mod kernel;
+mod framework;
 
 use kernel::task::Task;
 
@@ -15,18 +16,8 @@ fn main() {
     let wd = watchdog.clone();
 
     let tasks = [
-        Task::new("task1", 1000, || {
+        Task::new("Gyro", 1000, || {
             println!("task1");
-        }),
-        Task::new("task2", 2000, || {
-            println!("task2");
-        }),
-        Task::new("task3", 2000, || {
-            println!("task3");
-        }),
-        Task::new("task4", 2000, || {
-            std::thread::sleep(std::time::Duration::from_millis(1000));
-            println!("task4");
         }),
     ];
 
