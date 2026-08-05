@@ -1,4 +1,4 @@
-use crate::{framework::error, hal::krpc::ELECTRIC_CHARGE};
+use crate::{framework::error, hal::krpc::RESOURCE_EC};
 use stayputnik::services::space_center::Vessel;
 
 pub struct BatteryHal {
@@ -24,13 +24,13 @@ impl BatteryHal {
 
 
         let amount = resources
-            .amount(ELECTRIC_CHARGE)
+            .amount(RESOURCE_EC)
             .await
             .map_err(|_| error::FlightError::HardwareFailure(error::Reason::BatteryFault))?;
 
 
         let max_amount = resources
-            .max(ELECTRIC_CHARGE)
+            .max(RESOURCE_EC)
             .await
             .map_err(|_| error::FlightError::HardwareFailure(error::Reason::BatteryFault))?;
 

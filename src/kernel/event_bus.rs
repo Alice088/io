@@ -1,6 +1,5 @@
 use crate::{
-    framework::component,
-    kernel::{
+    framework::component::{ComponentId}, kernel::{
         clock::Ms,
         event::{Event, EventEnvelope, EventKind},
     },
@@ -13,16 +12,16 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum EventBusError {
     #[error("duplicate subscriber {0}")]
-    DuplicateSubscriber(component::Id),
+    DuplicateSubscriber(ComponentId),
 
     #[error("unknown subscriber {0}")]
-    UnknownSubscriber(component::Id),
+    UnknownSubscriber(ComponentId),
 
     #[error("pending queue is full")]
     PendingQueueFull,
 
     #[error("inbox for component {0} is full")]
-    InboxFull(component::Id),
+    InboxFull(ComponentId),
 
     #[error("event sequence overflow")]
     SequenceOverflow,
@@ -47,7 +46,7 @@ impl Subscriber {
 }
 
 pub struct EventBus {
-    subscribers: BTreeMap<component::Id, Subscriber>,
+    subscribers: BTreeMap<ComponentId, Subscriber>,
     pending: VecDeque<EventEnvelope>,
     next_sequence: u16,
     max_pending_events: usize,
@@ -77,7 +76,7 @@ impl EventBus {
 
     pub fn register_subscriber(
         &mut self,
-        component: component::Id,
+        component: ComponentId,
         subscriptions: &[EventKind],
     ) -> Result<(), EventBusError> {
         if self.subscribers.contains_key(&component) {
@@ -92,7 +91,7 @@ impl EventBus {
 
     pub fn publish(
         &mut self,
-        source: component::Id,
+        source: ComponentId,
         timestamp: Ms,
         event: Event,
     ) -> Result<u16, EventBusError> {
@@ -123,7 +122,7 @@ impl EventBus {
         while let Some(envelope) = self.pending.front().cloned() {
             let event_kind = envelope.event.kind();
 
-            let targets: Vec<component::Id> = self
+            let targets: Vec<ComponentId> = self
                 .subscribers
                 .iter()
                 .filter_map(|(component, subscriber)| {
@@ -159,7 +158,7 @@ impl EventBus {
 
     pub fn next_for(
         &mut self,
-        component: component::Id,
+        component: ComponentId,
     ) -> Result<Option<EventEnvelope>, EventBusError> {
         let subscriber = self
             .subscribers
@@ -171,7 +170,7 @@ impl EventBus {
 
     pub fn pending_for(
         &self,
-        component: component::Id,
+        component: ComponentId,
     ) -> Result<usize, EventBusError> {
         let subscriber = self
             .subscribers

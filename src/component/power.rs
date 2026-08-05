@@ -27,13 +27,14 @@ impl Component for Power {
         self.subscriptions
     }
 
+    // MADE BY GENIUS KERBIN-GOSHA; ЛИЧНО Я БЛЯТЬ СИДЕЛ ОКОЛО РАКЕТЫ, Я ПРОДАЛ ВСЮ СЕМЬЮ РАДИ НАУТБУКА ЧТОБЫ НАПИСАТЬ ЭТОТ КОД, Я БЛЯТЬ СИДЕЛ СУКА ДЕЛАЛ
     async fn update(&mut self) -> Vec<Event> {
         let mut v: Vec<Event> = Vec::new();
 
         let battaries = self.hal.get().await.map_err(|e| {
             match e {
                 crate::framework::error::FlightError::HardwareFailure(reason) => {
-                    v.push(Event::ComponentFault { component: self.id() as u8, reason: reason });
+                    v.push(Event::ComponentFault { component: self.id(), reason: reason });
                 }
 
                 _ => ()
@@ -54,7 +55,7 @@ impl Component for Power {
         v
     }
 
-    fn on_event(&mut self, _envelope: &EventEnvelope) -> Vec<Event> {
+    async fn on_event(&mut self, _envelope: &EventEnvelope) -> Vec<Event> {
         Vec::new()
     }
 }

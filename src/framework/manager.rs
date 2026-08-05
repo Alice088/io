@@ -1,18 +1,39 @@
 use std::collections::BTreeMap;
 
+use thiserror::Error;
+
 use crate::{
-    framework::component::{Component, Id},
-    kernel::event::{Event, EventEnvelope, EventKind},
+    framework::{
+        component::{
+            Component,
+            ComponentId
+        },
+        error::FlightError,
+    },
+    kernel::event::{
+        Event,
+        EventEnvelope,
+        EventKind,
+    },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ComponentManagerError {
-    AlreadyRegistered(Id),
-    NotFound(Id),
+    #[error("component {0} is already registered")]
+    AlreadyRegistered(ComponentId),
+
+    #[error("component {0} was not found")]
+    NotFound(ComponentId),
+
+    #[error("component {component_id} failed by {source}")]
+    ComponentFailed {
+        component_id: ComponentId,
+        source: FlightError,
+    },
 }
 
 pub struct ComponentManager {
-    components: BTreeMap<Id, Box<dyn Component>>,
+    components: BTreeMap<ComponentId, Box<dyn Component>>,
 }
 
 impl ComponentManager {
@@ -37,40 +58,67 @@ impl ComponentManager {
             );
         }
 
-        self.components.insert(id, Box::new(component));
+        self.components.insert(
+            id,
+            Box::new(component),
+        );
 
         Ok(())
     }
 
-    pub fn update(
+    pub async fn update(
         &mut self,
-        component_id: Id,
+        component_id: ComponentId,
     ) -> Result<Vec<Event>, ComponentManagerError> {
         let component = self
             .components
             .get_mut(&component_id)
-            .ok_or(ComponentManagerError::NotFound(component_id))?;
+            .ok_or(
+                ComponentManagerError::NotFound(
+                    component_id,
+                ),
+            )?;
 
-        Ok(component.update())
+        component
+            .update()
+            .await
+            .map_err(|source| {
+                ComponentManagerError::ComponentFailed {
+                    component_id,
+                    source,
+                }
+            })
     }
 
-    pub fn handle_event(
+    pub async fn handle_event(
         &mut self,
-        component_id: Id,
+        component_id: ComponentId,
         envelope: &EventEnvelope,
     ) -> Result<Vec<Event>, ComponentManagerError> {
         let component = self
             .components
             .get_mut(&component_id)
-            .ok_or(ComponentManagerError::NotFound(component_id))?;
+            .ok_or(
+                ComponentManagerError::NotFound(
+                    component_id,
+                ),
+            )?;
 
-        Ok(component.on_event(envelope))
+        component
+            .on_event(envelope)
+            .await
+            .map_err(|source| {
+                ComponentManagerError::ComponentFailed {
+                    component_id,
+                    source,
+                }
+            })
     }
 
     pub fn subscribers_for(
         &self,
         event_kind: EventKind,
-    ) -> Vec<Id> {
+    ) -> Vec<ComponentId> {
         self.components
             .iter()
             .filter_map(|(id, component)| {
@@ -82,7 +130,31 @@ impl ComponentManager {
             .collect()
     }
 
-    pub fn ids(&self) -> impl Iterator<Item = Id> + '_ {
+    pub fn ids(
+        &self,
+    ) -> impl Iterator<Item = ComponentId> + '_ {
         self.components.keys().copied()
+    }
+
+    pub fn contains(
+        &self,
+        component_id: ComponentId,
+    ) -> bool {
+        self.components
+            .contains_key(&component_id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.components.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.components.is_empty()
+    }
+}
+
+impl Default for ComponentManager {
+    fn default() -> Self {
+        Self::new()
     }
 }

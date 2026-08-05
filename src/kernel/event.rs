@@ -1,4 +1,4 @@
-use crate::{framework::{component, error}, kernel::clock::Ms};
+use crate::{framework::{component::{ComponentId}, error}, kernel::clock::Ms};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
@@ -38,7 +38,7 @@ pub enum Event {
     },
 
     ComponentFault {
-        component: component::Id,
+        component: ComponentId,
         reason: error::Reason,
     },
 }
@@ -61,7 +61,7 @@ impl Event {
 #[derive(Debug, Clone)]
 pub struct EventEnvelope {
     pub seq: u16,
-    pub source: component::Id,
+    pub source: ComponentId,
     pub timestamp: Ms,
     pub event: Event,
 }
