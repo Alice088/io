@@ -1,4 +1,4 @@
-use crate::{framework::component, kernel::clock::Ms};
+use crate::{framework::{component, error}, kernel::clock::Ms};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
@@ -16,11 +16,11 @@ pub enum EventKind {
 #[derive(Debug, Clone)]
 pub enum Event {
     BatteryLow {
-        percent: u8,
+        percent: f32,
     },
 
     BatteryCritical {
-        percent: u8,
+        percent: f32,
     },
 
     TargetReached,
@@ -39,17 +39,8 @@ pub enum Event {
 
     ComponentFault {
         component: component::Id,
-        reason: FaultReason,
+        reason: error::Reason,
     },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FaultReason {
-    Timeout,
-    Overcurrent,
-    SensorFailure,
-    StorageFull,
-    Unknown,
 }
 
 impl Event {
@@ -71,6 +62,6 @@ impl Event {
 pub struct EventEnvelope {
     pub seq: u16,
     pub source: component::Id,
-    pub timestamp_ms: Ms,
+    pub timestamp: Ms,
     pub event: Event,
 }

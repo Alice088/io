@@ -7,6 +7,8 @@ use crate::kernel::scheduler::Scheduler;
 use crate::kernel::watchdog::Watchdog;
 mod kernel;
 mod framework;
+mod component;
+mod hal;
 
 use kernel::task::Task;
 

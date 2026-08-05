@@ -110,7 +110,7 @@ impl EventBus {
         self.pending.push_back(EventEnvelope {
             seq,
             source,
-            timestamp_ms: timestamp,
+            timestamp,
             event,
         });
 
