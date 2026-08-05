@@ -1,6 +1,7 @@
 use crate::{
-    component::component::Percent, framework::component::{Component, ComponentId}, hal::battery::BatteryHal, kernel::event::{ Event, EventEnvelope, EventKind},
+    component::component::Percent, framework::{component, error::FlightError}, hal::battery::BatteryHal, kernel::event::{Event, EventEnvelope, EventKind},
 };
+use async_trait::async_trait;
 
 pub struct Power {
     hal: BatteryHal,
@@ -9,7 +10,7 @@ pub struct Power {
 }
 
 impl Power {
-    fn new(hal: BatteryHal, subscriptions: &'static [EventKind]) -> Power {
+    pub fn new(hal: BatteryHal, subscriptions: &'static [EventKind]) -> Power {
         Power {
             hal,
             subscriptions,
@@ -18,33 +19,39 @@ impl Power {
     }
 }
 
-impl Component for Power {
-    fn id(&self) -> ComponentId {
-        ComponentId::Power
+#[async_trait]
+impl component::Component  for Power {
+    fn id(&self) -> component::ComponentId {
+        component::ComponentId::Power
     }
 
     fn subscriptions(&self) -> &'static [EventKind] {
         self.subscriptions
     }
 
-    // MADE BY GENIUS KERBIN-GOSHA; ЛИЧНО Я БЛЯТЬ СИДЕЛ ОКОЛО РАКЕТЫ, Я ПРОДАЛ ВСЮ СЕМЬЮ РАДИ НАУТБУКА ЧТОБЫ НАПИСАТЬ ЭТОТ КОД, Я БЛЯТЬ СИДЕЛ СУКА ДЕЛАЛ
-    async fn update(&mut self) -> Vec<Event> {
+    // MADE BY GENIUS KERBIN-GOSHA; ЛИЧНО Я БЛЯТЬ СИДЕЛ ОКОЛО РАКЕТЫ, Я ПРОДАЛ ВСЮ СЕМЬЮ РАДИ НАУТБУКА ЧТОБЫ НАПИСАТЬ ЭТОТ КОД, Я БЛЯТЬ СИДЕЛ СУКА
+    async fn update(&mut self) -> Result<Vec<Event>, FlightError> {
         let mut v: Vec<Event> = Vec::new();
 
-        let battaries = self.hal.get().await.map_err(|e| {
-            match e {
-                crate::framework::error::FlightError::HardwareFailure(reason) => {
-                    v.push(Event::ComponentFault { component: self.id(), reason: reason });
-                }
+        let battery = self
+            .hal
+            .get()
+            .await
+            .map_err(|e| {
+                match e {
+                    crate::framework::error::FlightError::HardwareFailure(reason) => {
+                        v.push(Event::ComponentFault {
+                            component: self.id(),
+                            reason: reason,
+                        });
+                    }
 
-                _ => ()
-            };
-        });
+                    _ => (),
+                };
+            })
+            .unwrap();
 
-        let sum_amount: f32 = battaries.iter().map(|b| b.amount).sum();
-        let sum_max: f32 = battaries.iter().map(|b| b.max_amount).sum();
-
-        let p: Percent = (sum_amount / sum_max) * 100.0;
+        let p: Percent = (battery.amount / battery.max_amount) * 100.0;
         if p <= 30.0 {
             v.push(Event::BatteryLow { percent: p });
         };
@@ -52,10 +59,10 @@ impl Component for Power {
             v.push(Event::BatteryCritical { percent: p });
         };
 
-        v
+        Ok(v)
     }
 
-    async fn on_event(&mut self, _envelope: &EventEnvelope) -> Vec<Event> {
-        Vec::new()
+    async fn on_event(&mut self, _envelope: &EventEnvelope) -> Result<Vec<Event>, FlightError> {
+        Ok(Vec::new())
     }
 }

@@ -12,7 +12,7 @@ pub struct Battery {
 
 
 impl BatteryHal {
-    pub fn new(&self, vessel: &'static Vessel) -> BatteryHal {
+    pub fn new(vessel: &'static Vessel) -> BatteryHal {
         BatteryHal { vessel }
     }
 

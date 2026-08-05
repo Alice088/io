@@ -1,8 +1,14 @@
+use std::future::Future;
+use std::pin::Pin;
+
 use crate::kernel::clock::Ms;
 
-pub type TaskCallback = fn();
+pub type TaskFuture =
+    Pin<Box<dyn Future<Output = ()> + Send>>;
 
-#[derive(Clone, Copy)]
+pub type TaskCallback =
+    Box<dyn FnMut() -> TaskFuture + Send>;
+
 pub struct Task {
     pub name: &'static str,
     pub period: Ms,
@@ -11,7 +17,7 @@ pub struct Task {
 }
 
 impl Task {
-    pub const fn new(
+    pub fn new(
         name: &'static str,
         period: Ms,
         callback: TaskCallback,

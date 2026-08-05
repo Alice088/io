@@ -2,26 +2,55 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use hal::krpc;
+use kernel::task::Task;
+use stayputnik::services::space_center::SpaceCenter;
+
+use crate::component::power::Power;
+use crate::framework::component::Component;
+use crate::framework::manager::{ComponentManager, ComponentManagerError};
+use crate::hal::battery::BatteryHal;
 use crate::kernel::clock;
 use crate::kernel::scheduler::Scheduler;
 use crate::kernel::watchdog::Watchdog;
-mod kernel;
-mod framework;
+
 mod component;
+mod framework;
 mod hal;
+mod kernel;
 
-use kernel::task::Task;
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let config = krpc::KrpcConfig::default();
+    let krpc = krpc::Krpc::connect(config).await?;
+    let sc = SpaceCenter::new(krpc.client());
 
-fn main() {
     let watchdog = Arc::new(Mutex::new(Watchdog::new(4000)));
 
     let wd = watchdog.clone();
 
-    let tasks = [
-        Task::new("Gyro", 1000, || {
-            println!("task1");
+    let battery_hal = BatteryHal::new(&sc.active_vessel().await.expect("failed get vessel"));
+    let mut power = Power::new(battery_hal, &[]);
+
+    let tasks = [Task::new(
+        "power",
+        20,
+        Box::new(move || {
+            Box::pin(async move {
+                match power.update().await {
+                    Ok(events) => {
+                        for event in events {
+                            println!("EVENT: {:?}", event);
+                        }
+                    }
+
+                    Err(e) => {
+                        println!("POWER ERROR: {:?}", e);
+                    }
+                }
+            })
         }),
-    ];
+    )];
 
     thread::spawn(move || loop {
         thread::sleep(Duration::from_millis(20));
@@ -40,4 +69,7 @@ fn main() {
     let c = clock::MissionClock::start();
 
     scheduler.run(&c, watchdog);
+
+    drop(krpc);
+    Ok(())
 }

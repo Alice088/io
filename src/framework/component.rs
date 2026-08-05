@@ -29,13 +29,14 @@ pub enum ComponentId {
     Telemetry = 5,
 }
 
+pub type Percent = f32;
 
 #[async_trait]
 pub trait Component: Send {
     fn id(&self) -> ComponentId;
 
     fn subscriptions(&self) -> &'static [EventKind];
-    
+
     async fn update(
         &mut self,
     ) -> Result<Vec<Event>, FlightError>;

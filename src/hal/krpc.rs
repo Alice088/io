@@ -33,7 +33,7 @@ impl Default for KrpcConfig {
 }
 
 pub struct Krpc {
-    _client: ClientRef,
+    client: ClientRef,
 }
 
 impl Krpc {
@@ -47,7 +47,11 @@ impl Krpc {
         .into_shared();
 
         Ok(Self {
-            _client: client,
+            client,
         })
+    }
+
+    pub fn client(&self) -> ClientRef {
+        self.client.clone()
     }
 }
