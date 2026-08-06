@@ -3,11 +3,9 @@ use std::pin::Pin;
 
 use crate::kernel::clock::Ms;
 
-pub type TaskFuture =
-    Pin<Box<dyn Future<Output = ()> + Send>>;
+pub type TaskFuture = Pin<Box<dyn Future<Output = ()>>>;
 
-pub type TaskCallback =
-    Box<dyn FnMut() -> TaskFuture + Send>;
+pub type TaskCallback = Box<dyn FnMut() -> TaskFuture>;
 
 pub struct Task {
     pub name: &'static str,
@@ -17,11 +15,7 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(
-        name: &'static str,
-        period: Ms,
-        callback: TaskCallback,
-    ) -> Self {
+    pub fn new(name: &'static str, period: Ms, callback: TaskCallback) -> Self {
         Self {
             name,
             period,

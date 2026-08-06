@@ -8,7 +8,6 @@ use stayputnik::services::space_center::SpaceCenter;
 
 use crate::component::power::Power;
 use crate::framework::component::Component;
-use crate::framework::manager::{ComponentManager, ComponentManagerError};
 use crate::hal::battery::BatteryHal;
 use crate::kernel::clock;
 use crate::kernel::scheduler::Scheduler;
@@ -29,26 +28,34 @@ async fn main() -> anyhow::Result<()> {
 
     let wd = watchdog.clone();
 
-    let battery_hal = BatteryHal::new(&sc.active_vessel().await.expect("failed get vessel"));
-    let mut power = Power::new(battery_hal, &[]);
+    let battery_hal = BatteryHal::new(sc.active_vessel().await.expect("failed get vessel"));
+    let power = Arc::new(tokio::sync::Mutex::new(Power::new(battery_hal, &[])));
 
     let tasks = [Task::new(
         "power",
         20,
-        Box::new(move || {
-            Box::pin(async move {
-                match power.update().await {
-                    Ok(events) => {
-                        for event in events {
-                            println!("EVENT: {:?}", event);
+        Box::new({
+            let power = Arc::clone(&power);
+
+            move || {
+                let power = Arc::clone(&power);
+
+                Box::pin(async move {
+                    let mut power = power.lock().await;
+
+                    match power.update().await {
+                        Ok(events) => {
+                            for event in events {
+                                println!("EVENT: {:?}", event);
+                            }
+                        }
+
+                        Err(e) => {
+                            println!("POWER ERROR: {:?}", e);
                         }
                     }
-
-                    Err(e) => {
-                        println!("POWER ERROR: {:?}", e);
-                    }
-                }
-            })
+                })
+            }
         }),
     )];
 
@@ -68,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
 
     let c = clock::MissionClock::start();
 
-    scheduler.run(&c, watchdog);
+    scheduler.run(&c, watchdog).await;
 
     drop(krpc);
     Ok(())

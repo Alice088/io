@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::kernel::{
     clock::{MissionClock, Ms},
-    task::{Task},
+    task::Task,
     watchdog::Watchdog,
 };
 
@@ -14,12 +14,10 @@ pub struct Scheduler<const N: usize> {
 
 impl<const N: usize> Scheduler<N> {
     pub fn new(tasks: [Task; N]) -> Self {
-        Self {
-            tasks,
-        }
+        Self { tasks }
     }
 
-    pub fn run(&mut self, clock: &MissionClock, watchdog: Arc<Mutex<Watchdog>>) {
+    pub async fn run(&mut self, clock: &MissionClock, watchdog: Arc<Mutex<Watchdog>>) {
         loop {
             {
                 let mut wd = watchdog.lock().unwrap();
@@ -31,12 +29,12 @@ impl<const N: usize> Scheduler<N> {
                 if now.wrapping_sub(task.next) < Ms::MAX / 2 {
                     println!("[{} ms] RUN {}", now, task.name);
 
-                    (task.callback)();
+                    (task.callback)().await;
 
                     task.next = now + task.period;
                 }
             }
-            
+
             MissionClock::sleep_ms(TICK);
         }
     }
