@@ -28,8 +28,7 @@ impl component::Component  for Power {
     fn subscriptions(&self) -> &'static [EventKind] {
         self.subscriptions
     }
-
-    // MADE BY GENIUS KERBIN-GOSHA; ЛИЧНО Я БЛЯТЬ СИДЕЛ ОКОЛО РАКЕТЫ, Я ПРОДАЛ ВСЮ СЕМЬЮ РАДИ НАУТБУКА ЧТОБЫ НАПИСАТЬ ЭТОТ КОД, Я БЛЯТЬ СИДЕЛ СУКА
+    
     async fn update(&mut self) -> Result<Vec<Event>, FlightError> {
         let mut v: Vec<Event> = Vec::new();
 

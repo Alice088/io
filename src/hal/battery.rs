@@ -16,6 +16,7 @@ impl BatteryHal {
         BatteryHal { vessel }
     }
 
+    // MADE BY GENIUS KERBIN-GOSHA;
     pub async fn get(&self) -> Result<Battery, error::FlightError> {
         let resources = self.vessel
             .resources()
