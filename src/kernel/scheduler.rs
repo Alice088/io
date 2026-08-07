@@ -6,11 +6,8 @@ use std::{
 use tokio::{sync::Mutex, time::interval};
 
 use crate::{
-    fdir::{error::Error, reason::Reason},
-    framework::component::Component,
-    kernel::{
-        clock::Ms,
-        watchdog::Watchdog,
+    fdir::{error::Error, reason::Reason}, framework::component::Component, kernel::{
+        clock::{MissionClock, Ms}, watchdog::Watchdog,
     },
 };
 
@@ -32,14 +29,16 @@ pub struct Scheduler {
     tasks: Vec<Task>,
     tasks_limit: u8,
     tick: Ms,
+    clock: Box<MissionClock>
 }
 
 impl Scheduler {
-    pub fn new(tasks_limit: u8, tick: Ms) -> Scheduler {
+    pub fn new(tasks_limit: u8, tick: Ms, clock: Box<MissionClock>) -> Scheduler {
         Scheduler {
             tasks_limit,
             tasks: Vec::new(),
             tick,
+            clock
         }
     }
 
@@ -54,20 +53,23 @@ impl Scheduler {
 
     pub async fn run(&mut self, watchdog: Arc<Mutex<Watchdog>>) {
         let mut ticker = interval(Duration::from_millis(self.tick));
+        let start = std::time::Instant::now();
 
         loop {
             ticker.tick().await;
 
-            let mut wd = watchdog.lock().await;
-            wd.kick();
+            {
+                let mut wd = watchdog.lock().await;
+                wd.kick();
+            }
 
-            let now = std::time::Instant::now();
+            let now = self.clock.ms();
 
             for task in self.tasks.iter_mut() {
-                if now.elapsed().as_millis() as Ms >= task.next {
-                    println!("{}: RUN {}", now.elapsed().as_millis(), task.name);
+                if now >= task.next {
+                    println!("({}s){}: RUN {}", self.clock.sec(), now, task.name);
                     task.c.update().await;
-                    task.next += task.period;
+                    task.next = now + task.period;
                 }
             }
         }

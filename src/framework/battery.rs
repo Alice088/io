@@ -1,9 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{
-    framework::component::Component,
-    hal::battery::BatteryHal,
-};
+use crate::{framework::component::Component, hal::battery::BatteryHal};
 
 const LOW_PERCENT: f32 = 30.0;
 const CRITICAL_PERCENT: f32 = 10.0;
@@ -59,6 +56,8 @@ impl Component for Battery {
                 println!("BATTERY FAULT: {e}");
             }
         }
+
+        println!("BATTERY: {}", self.percent);
     }
 }
 
