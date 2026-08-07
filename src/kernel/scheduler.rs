@@ -53,7 +53,6 @@ impl Scheduler {
 
     pub async fn run(&mut self, watchdog: Arc<Mutex<Watchdog>>) {
         let mut ticker = interval(Duration::from_millis(self.tick));
-        let start = std::time::Instant::now();
 
         loop {
             ticker.tick().await;

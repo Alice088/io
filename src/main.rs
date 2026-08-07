@@ -23,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
     let vessel = sc.active_vessel().await?;
     let battery = Battery::new(BatteryHal::new(vessel));
 
-    let watchdog = Arc::new(Mutex::new(Watchdog::new(100000)));
+    let watchdog = Arc::new(Mutex::new(Watchdog::new(500)));
     let wd = watchdog.clone();
 
     thread::spawn(move || loop {
@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
 
     let clock = MissionClock::start();
     let mut scheduler = Scheduler::new(8, 100, Box::new(clock));
-    scheduler.add_task(Task::new(Box::new(battery), 1)).unwrap();
+    scheduler.add_task(Task::new(Box::new(battery), 1000)).unwrap();
 
     scheduler.run(watchdog.clone()).await;
 
