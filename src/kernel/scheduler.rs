@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc},
+    sync::Arc,
     time::Duration,
 };
 
@@ -10,7 +10,7 @@ use crate::{
     framework::component::Component,
     kernel::{
         clock::Ms,
-        watchdog::{self, Watchdog},
+        watchdog::Watchdog,
     },
 };
 
@@ -43,13 +43,13 @@ impl Scheduler {
         }
     }
 
-    pub fn add_task(&mut self, task: Task) -> Option<Error> {
-        if self.tasks.len() > 50 {
-            return Some(Error::Software(Reason::MaxScdulerTasks));
+    pub fn add_task(&mut self, task: Task) -> Result<(), Error> {
+        if self.tasks.len() >= self.tasks_limit as usize {
+            return Err(Error::Software(Reason::MaxScdulerTasks));
         }
 
         self.tasks.push(task);
-        None
+        Ok(())
     }
 
     pub async fn run(&mut self, watchdog: Arc<Mutex<Watchdog>>) {
@@ -65,9 +65,9 @@ impl Scheduler {
 
             for task in self.tasks.iter_mut() {
                 if now.elapsed().as_millis() as Ms >= task.next {
-                    let c = task.component.as_mut();
-                    c.update();
-                    task.next += task.period
+                    println!("{}: RUN {}", now.elapsed().as_millis(), task.name);
+                    task.c.update().await;
+                    task.next += task.period;
                 }
             }
         }

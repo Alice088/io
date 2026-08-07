@@ -1,4 +1,8 @@
-pub trait Component {
+use async_trait::async_trait;
+
+#[async_trait]
+pub trait Component: Send {
     fn name(&self) -> &'static str;
-    fn update(&mut self);
+
+    async fn update(&mut self);
 }

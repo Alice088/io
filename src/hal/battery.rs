@@ -1,5 +1,6 @@
 use stayputnik::services::space_center::Vessel;
 
+use crate::fdir::{error::Error, reason::Reason};
 
 const RESOURCE_EC: &str = "ElectricCharge";
 
@@ -18,22 +19,22 @@ impl BatteryHal {
         BatteryHal { vessel }
     }
 
-    pub async fn get(&self) -> Result<Battery, error::FlightError> {
+    pub async fn get(&self) -> Result<Battery, Error> {
         let resources = self
             .vessel
             .resources()
             .await
-            .map_err(|_| error::FlightError::HardwareFailure(error::Reason::BatteryFault))?;
+            .map_err(|_| Error::Hardware(Reason::BatteryFault))?;
 
         let amount = resources
             .amount(RESOURCE_EC)
             .await
-            .map_err(|_| error::FlightError::HardwareFailure(error::Reason::BatteryFault))?;
+            .map_err(|_| Error::Hardware(Reason::BatteryFault))?;
 
         let max_amount = resources
             .max(RESOURCE_EC)
             .await
-            .map_err(|_| error::FlightError::HardwareFailure(error::Reason::BatteryFault))?;
+            .map_err(|_| Error::Hardware(Reason::BatteryFault))?;
 
         Ok(Battery {
             amount: amount as f32,
