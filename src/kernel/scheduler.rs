@@ -1,41 +1,75 @@
-use std::sync::{Arc, Mutex};
-
-use crate::kernel::{
-    clock::{MissionClock, Ms},
-    task::Task,
-    watchdog::Watchdog,
+use std::{
+    sync::{Arc},
+    time::Duration,
 };
 
-const TICK: Ms = 10;
+use tokio::{sync::Mutex, time::interval};
 
-pub struct Scheduler<const N: usize> {
-    tasks: [Task; N],
+use crate::{
+    fdir::{error::Error, reason::Reason},
+    framework::component::Component,
+    kernel::{
+        clock::Ms,
+        watchdog::{self, Watchdog},
+    },
+};
+
+pub struct Task {
+    name: &'static str,
+    period: Ms,
+    next: Ms,
+    c: Box<dyn Component>,
 }
 
-impl<const N: usize> Scheduler<N> {
-    pub fn new(tasks: [Task; N]) -> Self {
-        Self { tasks }
+impl Task {
+    pub fn new(c: Box<dyn Component>, period: Ms) -> Self{
+        Self { name: c.name(), period, next: 0, c }
+    }
+}
+
+
+pub struct Scheduler {
+    tasks: Vec<Task>,
+    tasks_limit: u8,
+    tick: Ms,
+}
+
+impl Scheduler {
+    pub fn new(tasks_limit: u8, tick: Ms) -> Scheduler {
+        Scheduler {
+            tasks_limit,
+            tasks: Vec::new(),
+            tick,
+        }
     }
 
-    pub async fn run(&mut self, clock: &MissionClock, watchdog: Arc<Mutex<Watchdog>>) {
+    pub fn add_task(&mut self, task: Task) -> Option<Error> {
+        if self.tasks.len() > 50 {
+            return Some(Error::Software(Reason::MaxScdulerTasks));
+        }
+
+        self.tasks.push(task);
+        None
+    }
+
+    pub async fn run(&mut self, watchdog: Arc<Mutex<Watchdog>>) {
+        let mut ticker = interval(Duration::from_millis(self.tick));
+
         loop {
-            {
-                let mut wd = watchdog.lock().unwrap();
-                wd.kick();
-            }
-            let now = clock.ms();
+            ticker.tick().await;
 
-            for task in &mut self.tasks {
-                if now.wrapping_sub(task.next) < Ms::MAX / 2 {
-                    println!("[{} ms] RUN {}", now, task.name);
+            let mut wd = watchdog.lock().await;
+            wd.kick();
 
-                    (task.callback)().await;
+            let now = std::time::Instant::now();
 
-                    task.next = now + task.period;
+            for task in self.tasks.iter_mut() {
+                if now.elapsed().as_millis() as Ms >= task.next {
+                    let c = task.component.as_mut();
+                    c.update();
+                    task.next += task.period
                 }
             }
-
-            MissionClock::sleep_ms(TICK);
         }
     }
 }

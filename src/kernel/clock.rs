@@ -1,9 +1,10 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub type Ms = u64;
 
+
 pub struct MissionClock {
-    pub time: Instant,
+    time: Instant,
 }
 
 impl MissionClock {
@@ -15,9 +16,5 @@ impl MissionClock {
 
     pub fn ms(&self) -> Ms {
         self.time.elapsed().as_millis() as Ms
-    }
-
-    pub fn sleep_ms(ms: Ms) {
-        std::thread::sleep(Duration::from_millis(ms));
     }
 }

@@ -3,14 +3,14 @@ use std::time::Duration;
 
 pub struct Watchdog {
     last_kick: std::time::Instant,
-    timeout: Duration,
+    deadline: Duration,
 }
 
 impl Watchdog {
-    pub fn new(timeout_ms: Ms) -> Self {
+    pub fn new(deadline: Ms) -> Self {
         Self {
             last_kick: std::time::Instant::now(),
-            timeout: Duration::from_millis(timeout_ms),
+            deadline: Duration::from_millis(deadline),
         }
     }
 
@@ -19,6 +19,6 @@ impl Watchdog {
     }
 
     pub fn expired(&self) -> bool {
-        self.last_kick.elapsed() > self.timeout
+        self.last_kick.elapsed() > self.deadline
     }
 }

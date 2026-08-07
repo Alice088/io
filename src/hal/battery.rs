@@ -1,5 +1,7 @@
-use crate::{framework::error, hal::krpc::RESOURCE_EC};
 use stayputnik::services::space_center::Vessel;
+
+
+const RESOURCE_EC: &str = "ElectricCharge";
 
 pub struct BatteryHal {
     vessel: Vessel,
@@ -10,7 +12,7 @@ pub struct Battery {
     pub max_amount: f32,
 }
 
-// MADE BY GENIUS KERBIN-GOSHA; Я БЛЯТЬ СИДЕЛ СУКА
+// MADE BY GENIUS KERBIN-GOSHA; Я БЛЯТЬ СИДЕЛ СУКА.
 impl BatteryHal {
     pub fn new(vessel: Vessel) -> BatteryHal {
         BatteryHal { vessel }
