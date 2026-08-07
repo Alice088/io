@@ -4,7 +4,13 @@ use stayputnik::services::space_center::SpaceCenter;
 use tokio::sync::Mutex;
 
 use crate::{
-    framework::{battery::Battery, component::Component}, hal::battery::BatteryHal, kernel::{clock::MissionClock, scheduler::{Scheduler, Task}, watchdog::Watchdog},
+    framework::battery::Battery,
+    hal::battery::BatteryHal,
+    kernel::{
+        clock::MissionClock,
+        scheduler::{Scheduler, Task},
+        watchdog::Watchdog,
+    },
 };
 
 mod fdir;
@@ -37,7 +43,9 @@ async fn main() -> anyhow::Result<()> {
 
     let clock = MissionClock::start();
     let mut scheduler = Scheduler::new(8, 100, Box::new(clock));
-    scheduler.add_task(Task::new(Box::new(battery), 1000)).unwrap();
+    scheduler
+        .add_task(Task::new(Box::new(battery), 1000))
+        .unwrap();
 
     scheduler.run(watchdog.clone()).await;
 
