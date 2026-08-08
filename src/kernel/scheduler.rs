@@ -1,13 +1,15 @@
 use std::{
-    sync::Arc,
+    sync::{Arc, Mutex},
+    thread,
     time::Duration,
 };
 
-use tokio::{sync::Mutex, time::interval};
-
 use crate::{
-    fdir::{error::Error, reason::Reason}, framework::component::Component, kernel::{
-        clock::{MissionClock, Ms}, watchdog::Watchdog,
+    fdir::{error::Error, reason::Reason},
+    framework::component::Component,
+    kernel::{
+        clock::{MissionClock, Ms},
+        watchdog::Watchdog,
     },
 };
 
@@ -19,17 +21,21 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(c: Box<dyn Component>, period: Ms) -> Self{
-        Self { name: c.name(), period, next: 0, c }
+    pub fn new(c: Box<dyn Component>, period: Ms) -> Self {
+        Self {
+            name: c.name(),
+            period,
+            next: 0,
+            c,
+        }
     }
 }
-
 
 pub struct Scheduler {
     tasks: Vec<Task>,
     tasks_limit: u8,
     tick: Ms,
-    clock: Box<MissionClock>
+    clock: Box<MissionClock>,
 }
 
 impl Scheduler {
@@ -38,7 +44,7 @@ impl Scheduler {
             tasks_limit,
             tasks: Vec::new(),
             tick,
-            clock
+            clock,
         }
     }
 
@@ -51,23 +57,18 @@ impl Scheduler {
         Ok(())
     }
 
-    pub async fn run(&mut self, watchdog: Arc<Mutex<Watchdog>>) {
-        let mut ticker = interval(Duration::from_millis(self.tick));
-
+    pub fn run(&mut self, watchdog: Arc<Mutex<Watchdog>>) {
         loop {
-            ticker.tick().await;
+            thread::sleep(Duration::from_millis(self.tick));
 
-            {
-                let mut wd = watchdog.lock().await;
-                wd.kick();
-            }
+            watchdog.lock().unwrap().kick();
 
             let now = self.clock.ms();
 
             for task in self.tasks.iter_mut() {
                 if now >= task.next {
                     println!("({}s){}: RUN {}", self.clock.sec(), now, task.name);
-                    task.c.update().await;
+                    task.c.update();
                     task.next = now + task.period;
                 }
             }

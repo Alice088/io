@@ -1,15 +1,13 @@
-use std::time::Duration;
-
-use async_trait::async_trait;
-use tokio::time::sleep;
-
-use crate::{framework::component::Component, hal::battery::BatteryHal};
+use crate::{
+    framework::component::Component,
+    hal::world::{BatteryHandle, World},
+};
 
 const LOW_PERCENT: f32 = 30.0;
 const CRITICAL_PERCENT: f32 = 10.0;
 
 pub struct Battery {
-    hal: BatteryHal,
+    hal: BatteryHandle,
 
     pub percent: f32,
     pub low: bool,
@@ -18,9 +16,9 @@ pub struct Battery {
 }
 
 impl Battery {
-    pub fn new(hal: BatteryHal) -> Self {
+    pub fn new(world: &World) -> Self {
         Self {
-            hal,
+            hal: world.battery_hal(),
             percent: 0.0,
             low: false,
             critical: false,
@@ -39,14 +37,13 @@ pub fn compute_percent(amount: f32, max_amount: f32) -> f32 {
     ((amount / max_amount) * 100.0).clamp(0.0, 100.0)
 }
 
-#[async_trait]
 impl Component for Battery {
     fn name(&self) -> &'static str {
         "battery"
     }
 
-    async fn update(&mut self) {
-        match self.hal.get().await {
+    fn update(&mut self) {
+        match self.hal.get() {
             Ok(b) => {
                 self.percent = compute_percent(b.amount, b.max_amount);
                 self.low = self.percent <= LOW_PERCENT;

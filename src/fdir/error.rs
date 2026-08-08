@@ -1,7 +1,7 @@
 use crate::fdir::reason::Reason;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum Error {
     #[error("software error by: {0}")]
     Software(Reason),

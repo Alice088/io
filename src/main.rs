@@ -1,11 +1,12 @@
-use std::{sync::Arc, thread, time::Duration};
-
-use stayputnik::services::space_center::SpaceCenter;
-use tokio::sync::Mutex;
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
 
 use crate::{
     framework::battery::Battery,
-    hal::battery::BatteryHal,
+    hal::world::World,
     kernel::{
         clock::MissionClock,
         scheduler::{Scheduler, Task},
@@ -19,23 +20,17 @@ mod hal;
 mod kernel;
 mod planet;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let client = stayputnik::Client::connect("io-sat", "127.0.0.1", 50_000)
-        .await?
-        .into_shared();
-    let sc = SpaceCenter::new(client);
-
-    let vessel = sc.active_vessel().await?;
-    let battery = Battery::new(BatteryHal::new(vessel));
+fn main() {
+    let world = World::new().expect("world connect failed");
+    let battery = Battery::new(&world);
 
     let watchdog = Arc::new(Mutex::new(Watchdog::new(500)));
-    let wd = watchdog.clone();
+    let wd = Arc::clone(&watchdog);
 
     thread::spawn(move || loop {
         thread::sleep(Duration::from_millis(20));
 
-        if wd.blocking_lock().expired() {
+        if wd.lock().unwrap().expired() {
             println!("WATCHDOG RESET");
             std::process::exit(1);
         }
@@ -45,9 +40,7 @@ async fn main() -> anyhow::Result<()> {
     let mut scheduler = Scheduler::new(8, 100, Box::new(clock));
     scheduler
         .add_task(Task::new(Box::new(battery), 1000))
-        .unwrap();
+        .expect("task limit exceeded");
 
-    scheduler.run(watchdog.clone()).await;
-
-    Ok(())
+    scheduler.run(watchdog);
 }
