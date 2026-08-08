@@ -20,7 +20,7 @@ use stayputnik::services::space_center::Vessel;
 
 use crate::{
     fdir::{error::Error, reason::Reason},
-    hal::battery::Battery,
+    hal::{battery::Battery, gyro::Gyro},
 };
 
 const RESOURCE_EC: &str = "ElectricCharge";
@@ -29,6 +29,7 @@ const RESOURCE_EC: &str = "ElectricCharge";
 /// Каждый слот хранит последний исход опроса (Ok или ошибку).
 struct Shared {
     battery: Arc<Mutex<Result<Battery, Error>>>,
+    gyro: Arc<Mutex<Result<Gyro, Error>>>,
 }
 
 pub struct World {
@@ -62,6 +63,31 @@ impl BatteryHandle {
     }
 }
 
+/// Синхронный дескриптор последнего снимка гироскопа, который публикует World.
+///
+/// Аналог `BatteryHandle`: живёт, пока жив `World`.
+pub struct GyroHandle {
+    snapshot: Arc<Mutex<Result<Gyro, Error>>>,
+}
+
+impl GyroHandle {
+    pub fn get(&self) -> Result<Gyro, Error> {
+        let guard = self
+            .snapshot
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        match &*guard {
+            Ok(g) => Ok(Gyro {
+                pitch: g.pitch,
+                roll: g.roll,
+                yaw: g.yaw,
+            }),
+            Err(e) => Err(e.clone()),
+        }
+    }
+}
+
 impl World {
     /// Подключается к kRPC и запускает фоновый поллер.
     ///
@@ -71,6 +97,7 @@ impl World {
     pub fn new() -> Result<World, Error> {
         let shared = Arc::new(Shared {
             battery: Arc::new(Mutex::new(Err(Error::Hardware(Reason::BatteryFault)))),
+            gyro: Arc::new(Mutex::new(Err(Error::Hardware(Reason::GyroFault)))),
         });
         let shutdown = Arc::new(AtomicBool::new(false));
 
@@ -112,6 +139,16 @@ impl World {
     pub fn battery_hal(&self) -> BatteryHandle {
         BatteryHandle {
             snapshot: Arc::clone(&self.shared.battery),
+        }
+    }
+
+    /// Дескриптор гироскопа для компонентов.
+    ///
+    /// `World` должен жить дольше дескриптора (в `main` — держать `World`
+    /// в переменной до конца миссии).
+    pub fn gyro_hal(&self) -> GyroHandle {
+        GyroHandle {
+            snapshot: Arc::clone(&self.shared.gyro),
         }
     }
 }
@@ -159,7 +196,7 @@ fn poller(
             .await
             .map_err(|_| Error::Hardware(Reason::BatteryFault))?;
 
-        publish(&shared, fetch(&vessel).await);
+        publish(&shared, fetch(&vessel).await, fetch_gyro(&vessel).await);
         let _ = ready_inner.send(Ok(()));
 
         let mut ticker = tokio::time::interval(Duration::from_millis(poll_ms));
@@ -168,7 +205,7 @@ fn poller(
             if shutdown.load(Ordering::Relaxed) {
                 break;
             }
-            publish(&shared, fetch(&vessel).await);
+            publish(&shared, fetch(&vessel).await, fetch_gyro(&vessel).await);
         }
 
         Ok(())
@@ -179,8 +216,9 @@ fn poller(
     }
 }
 
-fn publish(shared: &Shared, result: Result<Battery, Error>) {
-    *shared.battery.lock().unwrap() = result;
+fn publish(shared: &Shared, battery: Result<Battery, Error>, gyro: Result<Gyro, Error>) {
+    *shared.battery.lock().unwrap() = battery;
+    *shared.gyro.lock().unwrap() = gyro;
 }
 
 async fn fetch(vessel: &Vessel) -> Result<Battery, Error> {
@@ -203,4 +241,55 @@ async fn fetch(vessel: &Vessel) -> Result<Battery, Error> {
         amount: amount as f32,
         max_amount: max_amount as f32,
     })
+}
+
+async fn fetch_gyro(vessel: &Vessel) -> Result<Gyro, Error> {
+    let frame = vessel
+        .reference_frame()
+        .await
+        .map_err(|_| Error::Hardware(Reason::GyroFault))?;
+
+    let (wx, wy, wz) = vessel
+        .angular_velocity(&frame)
+        .await
+        .map_err(|_| Error::Hardware(Reason::GyroFault))?;
+
+    Ok(Gyro::new(wx, wy, wz))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use super::{Error, Gyro, GyroHandle, Reason};
+
+    fn handle_with(snapshot: Result<Gyro, Error>) -> GyroHandle {
+        GyroHandle {
+            snapshot: Arc::new(Mutex::new(snapshot)),
+        }
+    }
+
+    #[test]
+    fn get_returns_snapshot_values() {
+        let handle = handle_with(Ok(Gyro {
+            pitch: 1.0,
+            roll: 2.0,
+            yaw: 3.0,
+        }));
+
+        let g = handle.get().unwrap();
+        assert_eq!(g.pitch, 1.0);
+        assert_eq!(g.roll, 2.0);
+        assert_eq!(g.yaw, 3.0);
+    }
+
+    #[test]
+    fn get_propagates_snapshot_error() {
+        let handle = handle_with(Err(Error::Hardware(Reason::GyroFault)));
+
+        assert!(matches!(
+            handle.get(),
+            Err(Error::Hardware(Reason::GyroFault))
+        ));
+    }
 }

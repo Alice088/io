@@ -5,9 +5,7 @@ use std::{
 };
 
 use crate::{
-    framework::battery::Battery,
-    hal::world::World,
-    kernel::{
+    framework::{battery::Battery, gyro::Gyro}, hal::world::World, kernel::{
         clock::MissionClock,
         scheduler::{Scheduler, Task},
         watchdog::Watchdog,
@@ -23,6 +21,8 @@ mod planet;
 fn main() {
     let world = World::new().expect("world connect failed");
     let battery = Battery::new(&world);
+    let gyro = Gyro::new(&world);
+
 
     let watchdog = Arc::new(Mutex::new(Watchdog::new(500)));
     let wd = Arc::clone(&watchdog);
@@ -40,6 +40,9 @@ fn main() {
     let mut scheduler = Scheduler::new(8, 100, Box::new(clock));
     scheduler
         .add_task(Task::new(Box::new(battery), 1000))
+        .expect("task limit exceeded");
+    scheduler
+        .add_task(Task::new(Box::new(gyro), 100))
         .expect("task limit exceeded");
 
     scheduler.run(watchdog);

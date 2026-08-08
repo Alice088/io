@@ -6,5 +6,8 @@ pub enum Reason {
     MaxScdulerTasks,
 
     #[error("battery fault")]
-    BatteryFault
+    BatteryFault,
+
+    #[error("gyro fault")]
+    GyroFault
 }
