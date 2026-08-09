@@ -12,6 +12,14 @@ pub fn parse(input: &str) -> Option<Command> {
             Some(Command::Off(Target::Stabilization))
         }
 
+        ["on", "damp"] => {
+            Some(Command::On(Target::Damping))
+        }
+
+        ["off", "damp"] => {
+            Some(Command::Off(Target::Damping))
+        }
+
         _ => None,
     }
 }

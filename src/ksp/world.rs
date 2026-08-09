@@ -20,6 +20,7 @@ use crate::{
     hal::{
         battery::{Battery, BatteryHal},
         gyro::{Gyro, GyroHal},
+        orientation::OrientationHal,
     },
     ksp::exec::Executor,
 };
@@ -74,6 +75,13 @@ impl World {
     pub fn gyro(&self) -> Result<Gyro, Error> {
         self.call(|exec, vessel, _| {
             GyroHal::new(vessel.clone(), exec.clone()).get()
+        })?
+    }
+
+    /// Applies roll/pitch/yaw control inputs, each in [-1; 1] (blocking kRPC call).
+    pub fn set_orientation(&self, roll: f64, pitch: f64, yaw: f64) -> Result<(), Error> {
+        self.call(move |exec, vessel, _| {
+            OrientationHal::new(vessel.clone(), exec.clone()).set(roll, pitch, yaw)
         })?
     }
 

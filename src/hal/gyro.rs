@@ -5,6 +5,7 @@ use stayputnik::services::space_center::Vessel;
 
 use crate::{
     fdir::{error::Error, reason::Reason},
+    framework::gyro::Quaternion,
     ksp::exec::Executor,
 };
 
@@ -14,17 +15,15 @@ pub struct GyroHal {
 }
 
 pub struct Gyro {
-    pub wx: f64,
-    pub wy: f64,
-    pub wz: f64,
+    pub angular_velocity: (f64, f64, f64),
+    pub rotation: Quaternion,
 }
 
 impl Gyro {
-    pub fn new(wx: f64, wy: f64, wz: f64) -> Self {
+    pub fn new(angular_velocity: (f64, f64, f64), rotation: Quaternion) -> Self {
         Self {
-            wx,
-            wy,
-            wz,
+            angular_velocity,
+            rotation,
         }
     }
 }
@@ -46,10 +45,22 @@ impl GyroHal {
             .block_on(self.vessel.angular_velocity(&frame))
             .map_err(|_| Error::Hardware(Reason::GyroFault))?;
 
-        Ok(Gyro::new(deadzone(x), deadzone(y), deadzone(z)))
+        let angular_velocity = (deadzone(x), deadzone(y), deadzone(z));
+
+        let quaternion = self
+            .exec
+            .block_on(self.vessel.rotation(&frame))
+            .map_err(|_| Error::Hardware(Reason::GyroFault))?;
+
+
+        Ok(Gyro::new(angular_velocity, quaternion))
     }
 }
 
 fn deadzone(value: f64) -> f64 {
-    if value.abs() > 0.001 { value } else { 0.0 }
+    if value.abs() > 0.001 {
+        value
+    } else {
+        0.0
+    }
 }

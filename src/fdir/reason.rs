@@ -11,6 +11,9 @@ pub enum Reason {
     #[error("gyro fault")]
     GyroFault,
 
+    #[error("orientation control fault")]
+    ControlFault,
+
     #[error("link to the game lost")]
     LinkLost,
 }

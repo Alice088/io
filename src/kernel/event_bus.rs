@@ -3,49 +3,75 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use crate::kernel::event::Event;
+use crate::{
+    framework::component::Component,
+    kernel::{clock::Ms, event::Event},
+};
+
+/// Recover from mutex poisoning: a poisoned mutex still holds valid data.
+fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 /// Thread-safe event bus.
 ///
-/// Publish from anywhere (any thread), drain from the single consumer
-/// (e.g. the scheduler loop). Clones share the same underlying queue,
+/// Publish events from anywhere (any thread), drain from the single consumer
+/// (e.g. the scheduler loop). Clones share the same underlying queues,
 /// so the bus can be handed out freely.
 #[derive(Clone)]
 pub struct EventBus {
     queue: Arc<Mutex<VecDeque<Event>>>,
+    pending_tasks: Arc<Mutex<VecDeque<(Box<dyn Component>, Ms)>>>,
+    pending_removals: Arc<Mutex<VecDeque<&'static str>>>,
 }
 
 impl EventBus {
     pub fn new() -> Self {
         Self {
             queue: Arc::new(Mutex::new(VecDeque::new())),
+            pending_tasks: Arc::new(Mutex::new(VecDeque::new())),
+            pending_removals: Arc::new(Mutex::new(VecDeque::new())),
         }
-    }
-
-    /// Lock with poison recovery: a poisoned mutex still holds valid data.
-    fn lock(&self) -> MutexGuard<'_, VecDeque<Event>> {
-        self.queue
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Push one event. Never fails.
     pub fn publish(&self, event: Event) {
-        self.lock().push_back(event);
+        lock(&self.queue).push_back(event);
     }
 
     /// Take all pending events in FIFO order. Empty vec if none.
     pub fn drain(&self) -> Vec<Event> {
-        self.lock().drain(..).collect()
+        lock(&self.queue).drain(..).collect()
     }
 
     /// Number of pending events.
     pub fn len(&self) -> usize {
-        self.lock().len()
+        lock(&self.queue).len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.lock().is_empty()
+        lock(&self.queue).is_empty()
+    }
+
+    /// Queue a new component to be registered as a scheduler task.
+    /// If the scheduler is full, the request is silently dropped there.
+    pub fn request_task(&self, component: Box<dyn Component>, period: Ms) {
+        lock(&self.pending_tasks).push_back((component, period));
+    }
+
+    /// Take all queued task requests in FIFO order.
+    pub fn take_requested_tasks(&self) -> Vec<(Box<dyn Component>, Ms)> {
+        lock(&self.pending_tasks).drain(..).collect()
+    }
+
+    /// Queue a task removal by name. No-op if no such task.
+    pub fn request_remove_task(&self, name: &'static str) {
+        lock(&self.pending_removals).push_back(name);
+    }
+
+    /// Take all queued removal requests in FIFO order.
+    pub fn take_removal_requests(&self) -> Vec<&'static str> {
+        lock(&self.pending_removals).drain(..).collect()
     }
 }
 

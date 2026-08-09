@@ -1,6 +1,19 @@
+use crate::cdh::command::Command;
+
 /// System events published by components to the event bus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Event {
+    CommandReceived(Command),
+
+
+    /// STAB
+    StabilizationEnabled,
+    StabilizationDisabled,
+
+    /// Rate-only damping (stop rotation, no attitude hold).
+    DampingEnabled,
+    DampingDisabled,
+
     /// Satellite booted / restarted.
     Boot,
 

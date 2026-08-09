@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     framework::component::Component,
+    kernel::event::Event,
     ksp::world::World,
 };
 
@@ -57,9 +58,9 @@ impl Component for Battery {
                 println!("BATTERY FAULT: {e}");
             }
         }
-
-        println!("BATTERY: {}", self.percent);
     }
+
+    fn on_event(&mut self, _event: Event) {}
 }
 
 #[cfg(test)]

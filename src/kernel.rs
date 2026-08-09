@@ -4,4 +4,3 @@ pub mod event_bus;
 pub mod scheduler;
 pub mod watchdog;
 pub mod state;
-pub mod satellite;

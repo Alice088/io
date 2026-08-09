@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
-use crate::{
-    framework::component::Component,
-    ksp::world::World,
-};
+use crate::{framework::component::Component, kernel::event::Event, ksp::world::World};
+
+pub type Quaternion = (f64, f64, f64, f64);
 
 pub struct Gyro {
     world: Arc<World>,
 
-    pub wx: f64,
-    pub xy: f64,
-    pub xz: f64,
+    pub angular_velocity: (f64, f64, f64),
+    pub rotation: Quaternion,
     pub fault: bool,
 }
 
@@ -18,9 +16,8 @@ impl Gyro {
     pub fn new(world: Arc<World>) -> Self {
         Self {
             world,
-            wx: 0.0,
-            xy: 0.0,
-            xz: 0.0,
+            angular_velocity: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0, 0.0),
             fault: false,
         }
     }
@@ -34,9 +31,8 @@ impl Component for Gyro {
     fn update(&mut self) {
         match self.world.gyro() {
             Ok(g) => {
-                self.wx = g.wx;
-                self.xy = g.wy;
-                self.xz = g.wz;
+                self.angular_velocity = g.angular_velocity;
+                self.rotation = g.rotation;
                 self.fault = false;
             }
 
@@ -45,7 +41,7 @@ impl Component for Gyro {
                 println!("GYRO FAULT: {e}");
             }
         }
-
-        println!("GYRO: wx={} wy={} wz={}", self.wx, self.xy, self.xz);
     }
+
+    fn on_event(&mut self, _event: Event) {}
 }

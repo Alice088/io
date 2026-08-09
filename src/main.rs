@@ -5,7 +5,9 @@ use std::{
 };
 
 use crate::{
-    framework::{battery::Battery, gyro::Gyro}, ksp::world::World, kernel::{
+    framework::{battery::Battery, gyro::Gyro, stab::Stab},
+    ksp::world::World,
+    kernel::{
         clock::MissionClock,
         scheduler::{Scheduler, Task},
         watchdog::Watchdog,
@@ -39,13 +41,19 @@ fn main() {
     });
 
     let clock = MissionClock::start();
-    let mut scheduler = Scheduler::new(8, 100, Box::new(clock));
+    // tick 20ms: the stab loop is sampling-limited (limit cycle ~ T^2),
+    // and each stab update is only ~1ms of kRPC calls (measured live).
+    let mut scheduler = Scheduler::new(8, 20, Box::new(clock));
+
+    // Read + parse commands from stdin on a dedicated thread.
+    let bus = scheduler.bus();
+    thread::spawn(move || crate::cdh::read_stdin(&bus));
+    
+    scheduler.add_task(Task::new(Box::new(battery), 1000)).unwrap();
+    scheduler.add_task(Task::new(Box::new(gyro), 100)).unwrap();
     scheduler
-        .add_task(Task::new(Box::new(battery), 1000))
-        .expect("task limit exceeded");
-    scheduler
-        .add_task(Task::new(Box::new(gyro), 100))
-        .expect("task limit exceeded");
+        .add_task(Task::new(Box::new(Stab::new(scheduler.bus(), Arc::clone(&world))), 20))
+        .unwrap();
 
     scheduler.run(watchdog);
 }
