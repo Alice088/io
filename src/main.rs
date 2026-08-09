@@ -18,6 +18,7 @@ mod hal;
 mod kernel;
 mod ksp;
 mod planet;
+mod cdh;
 
 fn main() {
     let world = Arc::new(World::new().expect("world connect failed"));
