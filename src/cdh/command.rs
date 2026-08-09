@@ -9,4 +9,6 @@ pub enum Target {
     Stabilization
 }
 
+pub enum Value {}
+
 pub enum Action {}
