@@ -1,24 +1,26 @@
+use std::sync::Arc;
+
 use crate::{
     framework::component::Component,
-    hal::world::{GyroHandle, World},
+    ksp::world::World,
 };
 
 pub struct Gyro {
-    hal: GyroHandle,
+    world: Arc<World>,
 
-    pub pitch: f64,
-    pub roll: f64,
-    pub yaw: f64,
+    pub wx: f64,
+    pub xy: f64,
+    pub xz: f64,
     pub fault: bool,
 }
 
 impl Gyro {
-    pub fn new(world: &World) -> Self {
+    pub fn new(world: Arc<World>) -> Self {
         Self {
-            hal: world.gyro_hal(),
-            pitch: 0.0,
-            roll: 0.0,
-            yaw: 0.0,
+            world,
+            wx: 0.0,
+            xy: 0.0,
+            xz: 0.0,
             fault: false,
         }
     }
@@ -30,11 +32,11 @@ impl Component for Gyro {
     }
 
     fn update(&mut self) {
-        match self.hal.get() {
+        match self.world.gyro() {
             Ok(g) => {
-                self.pitch = g.pitch;
-                self.roll = g.roll;
-                self.yaw = g.yaw;
+                self.wx = g.wx;
+                self.xy = g.wy;
+                self.xz = g.wz;
                 self.fault = false;
             }
 
@@ -44,6 +46,6 @@ impl Component for Gyro {
             }
         }
 
-        println!("GYRO: pitch={} roll={} yaw={}", self.pitch, self.roll, self.yaw);
+        println!("GYRO: wx={} wy={} wz={}", self.wx, self.xy, self.xz);
     }
 }

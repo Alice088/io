@@ -1,13 +1,15 @@
+use std::sync::Arc;
+
 use crate::{
     framework::component::Component,
-    hal::world::{BatteryHandle, World},
+    ksp::world::World,
 };
 
 const LOW_PERCENT: f32 = 30.0;
 const CRITICAL_PERCENT: f32 = 10.0;
 
 pub struct Battery {
-    hal: BatteryHandle,
+    world: Arc<World>,
 
     pub percent: f32,
     pub low: bool,
@@ -16,9 +18,9 @@ pub struct Battery {
 }
 
 impl Battery {
-    pub fn new(world: &World) -> Self {
+    pub fn new(world: Arc<World>) -> Self {
         Self {
-            hal: world.battery_hal(),
+            world,
             percent: 0.0,
             low: false,
             critical: false,
@@ -27,8 +29,7 @@ impl Battery {
     }
 }
 
-/// amount/max_amount -> percent, clamped to [0; 100].
-/// max_amount == 0 -> 0.0 (нет деления на ноль).
+/// amount/max_amount -> percent in [0; 100]. 0 if max_amount <= 0.
 pub fn compute_percent(amount: f32, max_amount: f32) -> f32 {
     if max_amount <= 0.0 {
         return 0.0;
@@ -43,7 +44,7 @@ impl Component for Battery {
     }
 
     fn update(&mut self) {
-        match self.hal.get() {
+        match self.world.battery() {
             Ok(b) => {
                 self.percent = compute_percent(b.amount, b.max_amount);
                 self.low = self.percent <= LOW_PERCENT;

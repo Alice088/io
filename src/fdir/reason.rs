@@ -9,5 +9,8 @@ pub enum Reason {
     BatteryFault,
 
     #[error("gyro fault")]
-    GyroFault
+    GyroFault,
+
+    #[error("link to the game lost")]
+    LinkLost,
 }

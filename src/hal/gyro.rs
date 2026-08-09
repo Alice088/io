@@ -1,45 +1,55 @@
-use stayputnik::services::space_center::{ReferenceFrame, Vessel};
+//! Gyro HAL device. Sync code via `self.exec.block_on(...)`.
+//! Runs in the worker thread; top level uses `World::gyro()`.
 
-use crate::fdir::{error::Error, reason::Reason};
+use stayputnik::services::space_center::Vessel;
+
+use crate::{
+    fdir::{error::Error, reason::Reason},
+    ksp::exec::Executor,
+};
 
 pub struct GyroHal {
     vessel: Vessel,
+    exec: Executor,
 }
 
 pub struct Gyro {
-    pub pitch: f64,
-    pub roll: f64,
-    pub yaw: f64,
+    pub wx: f64,
+    pub wy: f64,
+    pub wz: f64,
 }
 
 impl Gyro {
-    pub fn new(x: f64, y: f64, z: f64) -> Self {
+    pub fn new(wx: f64, wy: f64, wz: f64) -> Self {
         Self {
-            roll: x,
-            pitch: y,
-            yaw: z,
+            wx,
+            wy,
+            wz,
         }
     }
 }
 
 impl GyroHal {
-    pub fn new(vessel: Vessel) -> GyroHal {
-        GyroHal { vessel }
+    pub fn new(vessel: Vessel, exec: Executor) -> GyroHal {
+        GyroHal { vessel, exec }
     }
 
-    pub async fn get(&self) -> Result<Gyro, Error> {
+    /// Reads angular velocities (blocking).
+    pub fn get(&self) -> Result<Gyro, Error> {
         let frame = self
-            .vessel
-            .reference_frame()
-            .await
+            .exec
+            .block_on(self.vessel.orbital_reference_frame())
             .map_err(|_| Error::Hardware(Reason::GyroFault))?;
 
-        let (wx, wy, wz) = self
-            .vessel
-            .angular_velocity(&frame)
-            .await
+        let (x, y, z) = self
+            .exec
+            .block_on(self.vessel.angular_velocity(&frame))
             .map_err(|_| Error::Hardware(Reason::GyroFault))?;
 
-        Ok(Gyro::new(wx, wy, wz))
+        Ok(Gyro::new(deadzone(x), deadzone(y), deadzone(z)))
     }
+}
+
+fn deadzone(value: f64) -> f64 {
+    if value.abs() > 0.001 { value } else { 0.0 }
 }

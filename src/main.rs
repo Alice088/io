@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    framework::{battery::Battery, gyro::Gyro}, hal::world::World, kernel::{
+    framework::{battery::Battery, gyro::Gyro}, ksp::world::World, kernel::{
         clock::MissionClock,
         scheduler::{Scheduler, Task},
         watchdog::Watchdog,
@@ -16,12 +16,13 @@ mod fdir;
 mod framework;
 mod hal;
 mod kernel;
+mod ksp;
 mod planet;
 
 fn main() {
-    let world = World::new().expect("world connect failed");
-    let battery = Battery::new(&world);
-    let gyro = Gyro::new(&world);
+    let world = Arc::new(World::new().expect("world connect failed"));
+    let battery = Battery::new(Arc::clone(&world));
+    let gyro = Gyro::new(Arc::clone(&world));
 
 
     let watchdog = Arc::new(Mutex::new(Watchdog::new(500)));

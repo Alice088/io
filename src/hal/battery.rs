@@ -1,11 +1,18 @@
+//! Battery HAL device. Sync code via `self.exec.block_on(...)`.
+//! Runs in the worker thread; top level uses `World::battery()`.
+
 use stayputnik::services::space_center::Vessel;
 
-use crate::fdir::{error::Error, reason::Reason};
+use crate::{
+    fdir::{error::Error, reason::Reason},
+    ksp::exec::Executor,
+};
 
 const RESOURCE_EC: &str = "ElectricCharge";
 
 pub struct BatteryHal {
     vessel: Vessel,
+    exec: Executor,
 }
 
 pub struct Battery {
@@ -15,25 +22,25 @@ pub struct Battery {
 
 // MADE BY GENIUS KERBIN-GOSHA; Я БЛЯТЬ СИДЕЛ СУКА.
 impl BatteryHal {
-    pub fn new(vessel: Vessel) -> BatteryHal {
-        BatteryHal { vessel }
+    pub fn new(vessel: Vessel, exec: Executor) -> BatteryHal {
+        BatteryHal { vessel, exec }
     }
 
-    pub async fn get(&self) -> Result<Battery, Error> {
+    /// Reads battery charge (blocking).
+    pub fn get(&self) -> Result<Battery, Error> {
         let resources = self
-            .vessel
-            .resources()
-            .await
+            .exec
+            .block_on(self.vessel.resources())
             .map_err(|_| Error::Hardware(Reason::BatteryFault))?;
 
-        let amount = resources
-            .amount(RESOURCE_EC)
-            .await
+        let amount = self
+            .exec
+            .block_on(resources.amount(RESOURCE_EC))
             .map_err(|_| Error::Hardware(Reason::BatteryFault))?;
 
-        let max_amount = resources
-            .max(RESOURCE_EC)
-            .await
+        let max_amount = self
+            .exec
+            .block_on(resources.max(RESOURCE_EC))
             .map_err(|_| Error::Hardware(Reason::BatteryFault))?;
 
         Ok(Battery {
