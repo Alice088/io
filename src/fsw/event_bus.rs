@@ -4,8 +4,8 @@ use std::{
 };
 
 use crate::{
-    framework::component::Component,
-    kernel::{clock::Ms, event::Event},
+    cdh::clock::Ms,
+    fsw::{component::Component, event::Event},
 };
 
 /// Recover from mutex poisoning: a poisoned mutex still holds valid data.

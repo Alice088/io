@@ -1,4 +1,4 @@
-use crate::kernel::event::Event;
+use crate::fsw::event::Event;
 
 pub trait Component: Send {
     fn name(&self) -> &'static str;

@@ -1,11 +1,11 @@
+pub mod clock;
 pub mod command;
-pub mod parser;
 
 use std::io::{self, BufRead};
 
 use crate::{
     cdh::command::{Command, Target},
-    kernel::{event::Event, event_bus::EventBus},
+    fsw::{event::Event, event_bus::EventBus},
 };
 
 /// Map a parsed command to the event it triggers. Unknown -> None.
@@ -22,7 +22,7 @@ pub fn command_to_event(command: Command) -> Option<Event> {
 /// Parse one input line and publish the resulting event to the bus.
 /// Returns true if the input produced a published event.
 pub fn publish_command(input: &str, bus: &EventBus) -> bool {
-    match parser::parse(input) {
+    match crate::ttc::parser::parse(input) {
         Some(command) => match command_to_event(command) {
             Some(event) => {
                 bus.publish(event);

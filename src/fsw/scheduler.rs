@@ -5,14 +5,9 @@ use std::{
 };
 
 use crate::{
-    fdir::{error::Error, reason::Reason},
-    framework::component::Component,
-    kernel::{
-        clock::{MissionClock, Ms},
-        event::Event,
-        event_bus::EventBus,
-        watchdog::Watchdog,
-    },
+    cdh::clock::{MissionClock, Ms},
+    fdir::{error::Error, reason::Reason, watchdog::Watchdog},
+    fsw::{component::Component, event::Event, event_bus::EventBus},
 };
 
 pub struct Task {

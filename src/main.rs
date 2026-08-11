@@ -5,27 +5,24 @@ use std::{
 };
 
 use crate::{
-    framework::{battery::Battery, gyro::Gyro, stab::Stab},
-    ksp::world::World,
-    kernel::{
-        clock::MissionClock,
-        scheduler::{Scheduler, Task},
-        watchdog::Watchdog,
-    },
+    adcs::{gyro::Gyro, orientation::Orientation, stab::Stab}, cdh::clock::MissionClock, eps::battery::Battery, fdir::watchdog::Watchdog, fsw::scheduler::{Scheduler, Task}, hal::orientation, ksp::world::World,
 };
 
-mod fdir;
-mod framework;
-mod hal;
-mod kernel;
-mod ksp;
-mod planet;
+mod adcs;
 mod cdh;
+mod eps;
+mod fdir;
+mod fsw;
+mod hal;
+mod ksp;
+mod ttc;
 
 fn main() {
     let world = Arc::new(World::new().expect("world connect failed"));
+
     let battery = Battery::new(Arc::clone(&world));
     let gyro = Gyro::new(Arc::clone(&world));
+    let orientation = Orientation::new(Arc::clone(&world));
 
 
     let watchdog = Arc::new(Mutex::new(Watchdog::new(500)));
@@ -41,19 +38,17 @@ fn main() {
     });
 
     let clock = MissionClock::start();
-    // tick 20ms: the stab loop is sampling-limited (limit cycle ~ T^2),
-    // and each stab update is only ~1ms of kRPC calls (measured live).
     let mut scheduler = Scheduler::new(8, 20, Box::new(clock));
 
-    // Read + parse commands from stdin on a dedicated thread.
     let bus = scheduler.bus();
-    thread::spawn(move || crate::cdh::read_stdin(&bus));
+    let b = Arc::clone(&bus);
+    thread::spawn(move || crate::cdh::read_stdin(&b));
+
+    let stab = Stab::new(Arc::clone(&bus), Arc::clone(&world), Box::new(orientation));
     
     scheduler.add_task(Task::new(Box::new(battery), 1000)).unwrap();
     scheduler.add_task(Task::new(Box::new(gyro), 100)).unwrap();
-    scheduler
-        .add_task(Task::new(Box::new(Stab::new(scheduler.bus(), Arc::clone(&world))), 20))
-        .unwrap();
+    scheduler.add_task(Task::new(Box::new(stab), 100)).unwrap();
 
     scheduler.run(watchdog);
 }

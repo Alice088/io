@@ -18,7 +18,6 @@ impl OrientationHal {
         OrientationHal { vessel, exec }
     }
 
-    /// Applies roll/pitch/yaw control inputs, each in [-1; 1] (blocking).
     pub fn set(&self, roll: f64, pitch: f64, yaw: f64) -> Result<(), Error> {
         let control = self
             .exec

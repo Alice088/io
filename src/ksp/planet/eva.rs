@@ -1,4 +1,4 @@
-use crate::planet::traits::Planet;
+use crate::ksp::planet::traits::Planet;
 
 pub struct Eva {
     name: &'static str

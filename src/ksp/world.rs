@@ -20,7 +20,7 @@ use crate::{
     hal::{
         battery::{Battery, BatteryHal},
         gyro::{Gyro, GyroHal},
-        orientation::OrientationHal,
+        orientation::OrientationHal
     },
     ksp::exec::Executor,
 };

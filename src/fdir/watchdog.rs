@@ -1,4 +1,4 @@
-use crate::kernel::clock::Ms;
+use crate::cdh::clock::Ms;
 use std::time::Duration;
 
 pub struct Watchdog {

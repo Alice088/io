@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    framework::component::Component,
-    kernel::event::Event,
+    fsw::{component::Component, event::Event},
     ksp::world::World,
 };
 

@@ -4,9 +4,7 @@
 use stayputnik::services::space_center::Vessel;
 
 use crate::{
-    fdir::{error::Error, reason::Reason},
-    framework::gyro::Quaternion,
-    ksp::exec::Executor,
+    adcs::gyro::{AngularVelocity, Quaternion}, fdir::{error::Error, reason::Reason}, ksp::exec::Executor,
 };
 
 pub struct GyroHal {
@@ -15,12 +13,12 @@ pub struct GyroHal {
 }
 
 pub struct Gyro {
-    pub angular_velocity: (f64, f64, f64),
+    pub angular_velocity: AngularVelocity,
     pub rotation: Quaternion,
 }
 
 impl Gyro {
-    pub fn new(angular_velocity: (f64, f64, f64), rotation: Quaternion) -> Self {
+    pub fn new(angular_velocity: AngularVelocity, rotation: Quaternion) -> Self {
         Self {
             angular_velocity,
             rotation,
@@ -53,7 +51,7 @@ impl GyroHal {
             .map_err(|_| Error::Hardware(Reason::GyroFault))?;
 
 
-        Ok(Gyro::new(angular_velocity, quaternion))
+        Ok(Gyro::new(AngularVelocity::from(angular_velocity), Quaternion::from(quaternion)))
     }
 }
 
