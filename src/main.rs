@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    adcs::{gyro::Gyro, orientation::Orientation, stab::Stab}, cdh::clock::MissionClock, eps::battery::Battery, fdir::watchdog::Watchdog, fsw::scheduler::{Scheduler, Task}, hal::orientation, ksp::world::World,
+    adcs::{gyro::Gyro, orientation::Orientation, stab::Stab}, cdh::clock::MissionClock, eps::battery::Battery, fdir::watchdog::Watchdog, fsw::scheduler::{Scheduler, Task}, ksp::world::World,
 };
 
 mod adcs;
@@ -21,7 +21,7 @@ fn main() {
     let world = Arc::new(World::new().expect("world connect failed"));
 
     let battery = Battery::new(Arc::clone(&world));
-    let gyro = Gyro::new(Arc::clone(&world));
+    let (gyro, gyro_state) = Gyro::new(Arc::clone(&world));
     let orientation = Orientation::new(Arc::clone(&world));
 
 
@@ -44,7 +44,7 @@ fn main() {
     let b = Arc::clone(&bus);
     thread::spawn(move || crate::cdh::read_stdin(&b));
 
-    let stab = Stab::new(Arc::clone(&bus), Arc::clone(&world), Box::new(orientation));
+    let stab = Stab::new(gyro_state, Arc::clone(&bus), Box::new(orientation));
     
     scheduler.add_task(Task::new(Box::new(battery), 1000)).unwrap();
     scheduler.add_task(Task::new(Box::new(gyro), 100)).unwrap();
