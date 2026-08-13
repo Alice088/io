@@ -1,8 +1,3 @@
-//! `io_tests` — standalone kRPC connectivity smoke test.
-//!
-//! Connects to a running kRPC server and fetches the active vessel.
-//! Usage: `cargo run --bin io_tests` (kRPC server must be up).
-
 use std::time::Duration;
 
 use anyhow::Context;
@@ -39,131 +34,83 @@ async fn main() -> anyhow::Result<()> {
         .context("no active vessel (build one in KSP)")?;
     println!("control handle: {control:?}");
 
-    let frame = vessel.reference_frame().await?;
-    let current_q = &Quaternion::from(vessel.rotation(&frame).await?);
-    let current_norm_q = Quaternion::normalize(current_q);
+    let kp = 1.0;
+    let kd = 0.5;
 
-    // println!("current_q: {:?}", current_q);
-    // println!("current_norm_q: {:?}", current_norm_q);
-    let target_q = Quaternion::normalize(&Quaternion {
-        w: (90.0_f64.to_radians() / 2.0).cos(),
-        x: 0.0,
-        y: (90.0_f64.to_radians() / 2.0).sin(),
-        z: 0.0,
-    });
+    let frame = vessel.orbital_reference_frame().await?;
+    let target_q = Quaternion::from(vessel.rotation(&frame).await?);
 
-    // let qerror = current_norm_q.mul(&target_q.inverse());
+    let mut iteration = 0;
+    loop {
+        sleep(Duration::from_millis(10)).await;
 
-    // let angle = 2.0 * qerror.w.acos();
-    // let s = (1.0 - qerror.w * qerror.w).sqrt();
+        iteration += 1;
+        println!("=== Iter {} ===", iteration);
 
-    // let axis_x = qerror.x / s;
-    // let axis_y = qerror.y / s;
-    // let axis_z = qerror.z / s;
+        let current_q = Quaternion::from(vessel.rotation(&frame).await?);
+        println!("current_q: {:?}", current_q);
+        println!("target_q: {:?}", target_q);
 
-    // println!("target offset: {angle:.3} rad about ({axis_x:.3}, {axis_y:.3}, {axis_z:.3})");
+        let mut error_q = Quaternion::normalize(&Quaternion::inverse(&current_q).mul(&target_q));
+        if error_q.w < 0.0 {
+            error_q.full_inverse();
+        }
+        println!(
+            "error_q (vec): ({:.3}, {:.3}, {:.3})",
+            error_q.x, error_q.y, error_q.z
+        );
 
-    // let kp = 0.5;
+        let (ax, ay, az, angle) = error_q.to_axis_angle();
 
-    // let roll_cmd = (kp * axis_x * angle).clamp(-1.0, 1.0);
-    // let pitch_cmd = (kp * axis_y * angle).clamp(-1.0, 1.0);
-    // let yaw_cmd = (kp * axis_z * angle).clamp(-1.0, 1.0);
+        let error_vec = [ax * angle, ay * angle, az * angle];
 
-    // control.set_roll(roll_cmd as f32).await?;
-    // control.set_pitch(0.5).await?;
-    // control.set_yaw(yaw_cmd as f32).await?;
+        let velocity = vessel.angular_velocity(&frame).await?;
+        println!(
+            "velocity: ({:.3}, {:.3}, {:.3})",
+            velocity.0, velocity.1, velocity.2
+        );
 
-    // sleep(Duration::new(1, 0)).await;
+        let local_vel = Quaternion::rotate_vector(&current_q, velocity);
+        println!(
+            "velocity local: ({:.3}, {:.3}, {:.3})",
+            local_vel.0, local_vel.1, local_vel.2
+        );
 
-    // control.set_roll(0.0).await?;
-    // control.set_pitch(0.0).await?;
-    // control.set_yaw(0.0).await?;
+        println!("angle: {angle}");
+        const ANGLE_THRESHOLD: f64 = 0.02; // ~1°
+        const VEL_THRESHOLD: f64 = 0.01; // рад/с
+        if angle < ANGLE_THRESHOLD
+            && local_vel.0.abs() < VEL_THRESHOLD
+            && local_vel.1.abs() < VEL_THRESHOLD
+            && local_vel.2.abs() < VEL_THRESHOLD
+        {
+            println!("Target reached, holding.");
+            control.set_roll(0.0).await?;
+            control.set_pitch(0.0).await?;
+            control.set_yaw(0.0).await?;
+            continue;
+        }
 
-    // loop {
-    //     let current = Quaternion::normalize(&Quaternion::from(vessel.rotation(&frame).await?));
+        let cm = VecControlMomentum {
+            x: -kp * error_vec[0] - kd * local_vel.0,
+            y: -kp * error_vec[1] - kd * local_vel.1,
+            z: -kp * error_vec[2] - kd * local_vel.2,
+        };
+        println!("cm: ({:.3}, {:.3}, {:.3})", cm.x, cm.y, cm.z);
 
-    //     let qerror = target_q.mul(&current.inverse());
+        const MAX_MOMENT: f64 = 1.0;
+        let cmd_x = (cm.x / MAX_MOMENT).clamp(-1.0, 1.0);
+        let cmd_y = (cm.y / MAX_MOMENT).clamp(-1.0, 1.0);
+        let cmd_z = (cm.z / MAX_MOMENT).clamp(-1.0, 1.0);
+        println!("cmd: x={:.3}, y={:.3}, z={:.3}", cmd_x, cmd_y, cmd_z);
 
-    //     let angle = 2.0 * qerror.w.clamp(-1.0, 1.0).acos();
+        println!("Setting controls...");
+        control.set_roll(cmd_y as f32).await?;
+        control.set_pitch(cmd_x as f32).await?;
+        control.set_yaw(cmd_z as f32).await?;
+        println!("Controls set.");
+    }
 
-    //     println!(
-    //         "error: {:.2}°, q = ({:.4}, {:.4}, {:.4}, {:.4})",
-    //         angle.to_degrees(),
-    //         qerror.w,
-    //         qerror.x,
-    //         qerror.y,
-    //         qerror.z
-    //     );
-
-    //     if angle < 2.0_f64.to_radians() {
-    //         control.set_pitch(0.0).await?;
-    //         break;
-    //     }
-
-    //     let command = (0.5 * qerror.y).clamp(-1.0, 1.0);
-
-    //     control.set_roll(0.0).await?;
-    //     control.set_pitch(command as f32).await?;
-    //     control.set_yaw(0.0).await?;
-
-    //     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    // }
-
-    let current = Quaternion::normalize(&Quaternion::from(vessel.rotation(&frame).await?));
-
-    let delta = Quaternion {
-        w: (45.0_f64.to_radians()).cos(),
-        x: 0.0,
-        y: (45.0_f64.to_radians()).sin(),
-        z: 0.0,
-    };
-
-    let target = Quaternion::normalize(&delta.mul(&current));
-
-    println!("current = {:?}", current);
-    println!("target  = {:?}", target);
-
-    let error = target.mul(&current.inverse());
-
-    println!("error   = {:?}", error);
-
-    let angle = 2.0 * error.w.acos();
-    let s = (1.0 - error.w * error.w).sqrt();
-
-    let axis_y = error.y / s;
-
-    let command = (0.5 * axis_y * angle).clamp(-1.0, 1.0);
-
-    println!(
-        "angle: {:.2}°, axis_y: {:.3}, pitch: {:.3}",
-        angle.to_degrees(),
-        axis_y,
-        command
-    );
-
-    let axis_x = error.x / s;
-    let axis_y = error.y / s;
-    let axis_z = error.z / s;
-
-    let kp = 0.5;
-
-    let roll_cmd = (kp * axis_x * angle).clamp(-1.0, 1.0);
-    let pitch_cmd = (kp * axis_y * angle).clamp(-1.0, 1.0);
-    let yaw_cmd = (kp * axis_z * angle).clamp(-1.0, 1.0);
-
-    control.set_roll(roll_cmd as f32).await?;
-    control.set_pitch(pitch_cmd as f32).await?;
-    control.set_yaw(yaw_cmd as f32).await?;
-
-    sleep(Duration::new(1, 0)).await;
-
-    control.set_roll(0.0).await?;
-    control.set_pitch(0.0).await?;
-    control.set_yaw(0.0).await?;
-
-    let current_move = Quaternion::normalize(&Quaternion::from(vessel.rotation(&frame).await?));
-
-    println!("current after move {:?}", current_move);
     Ok(())
 }
 
@@ -185,11 +132,10 @@ pub struct AngularVelocity {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct RotationError {
-    pub axis_x: f64,
-    pub axis_y: f64,
-    pub axis_z: f64,
-    pub angle: f64,
+pub struct VecControlMomentum {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
 }
 
 impl AngularVelocity {
@@ -203,8 +149,8 @@ impl AngularVelocity {
 
     pub fn from(current: (f64, f64, f64)) -> Self {
         Self {
-            y: current.0,
-            x: current.1,
+            x: current.0,
+            y: current.1,
             z: current.2,
         }
     }
@@ -214,18 +160,18 @@ impl Quaternion {
     pub fn new() -> Self {
         Self {
             w: 1.0,
-            y: 0.0,
             x: 0.0,
+            y: 0.0,
             z: 0.0,
         }
     }
 
     pub fn from(current: (f64, f64, f64, f64)) -> Self {
         Self {
-            w: current.0,
+            x: current.0,
             y: current.1,
-            x: current.2,
-            z: current.3,
+            z: current.2,
+            w: current.3,
         }
     }
 
@@ -263,27 +209,34 @@ impl Quaternion {
         }
     }
 
-    pub fn to_axis_angle(&self) -> RotationError {
+    pub fn full_inverse(&mut self) {
+        self.w = -self.w;
+        self.x = -self.x;
+        self.y = -self.y;
+        self.z = -self.z;
+    }
+
+    pub fn to_axis_angle(&self) -> (f64, f64, f64, f64) {
         let w = self.w.clamp(-1.0, 1.0);
-
         let angle = 2.0 * w.acos();
-
-        let sin_half_angle = (1.0 - w * w).sqrt();
-
-        if sin_half_angle < 1e-8 {
-            return RotationError {
-                axis_x: 0.0,
-                axis_y: 0.0,
-                axis_z: 0.0,
-                angle: 0.0,
-            };
+        let sin_half = (1.0 - w * w).sqrt();
+        if sin_half < 1e-10 {
+            return (0.0, 0.0, 0.0, 0.0);
         }
+        let scale = 1.0 / sin_half;
+        (self.x * scale, self.y * scale, self.z * scale, angle)
+    }
 
-        RotationError {
-            axis_x: self.x / sin_half_angle,
-            axis_y: self.y / sin_half_angle,
-            axis_z: self.z / sin_half_angle,
-            angle,
-        }
+    fn rotate_vector(q: &Quaternion, v: (f64, f64, f64)) -> (f64, f64, f64) {
+        let v_q = Quaternion {
+            w: 0.0,
+            x: v.0,
+            y: v.1,
+            z: v.2,
+        };
+        let q_inv = q.inverse();
+        let tmp = q_inv.mul(&v_q);
+        let res = tmp.mul(&q);
+        (res.x, res.y, res.z)
     }
 }
